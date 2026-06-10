@@ -1,0 +1,86 @@
+name: Build Rules
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub Actions cron uses UTC. 01:00 UTC is 09:00 Asia/Shanghai.
+    - cron: '0 1 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'rulesets/**'
+      - '.github/workflows/build-rules.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-rules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download mihomo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .tools
+          gh release download \
+            --repo MetaCubeX/mihomo \
+            --pattern 'mihomo-linux-amd64-v1-v*.gz' \
+            --dir .tools
+
+          ASSET="$(find .tools -name 'mihomo-linux-amd64-v1-v*.gz' -print -quit)"
+          test -n "$ASSET"
+          gzip -dc "$ASSET" > .tools/mihomo
+          chmod +x .tools/mihomo
+          .tools/mihomo -v
+
+      - name: Build rules tree
+        run: |
+          rm -rf build publish
+          mkdir -p build publish
+
+          git clone --depth 1 --branch meta https://github.com/MetaCubeX/meta-rules-dat.git build/meta-rules-dat
+          cp -R build/meta-rules-dat/geo publish/geo
+
+          awk '
+            {
+              sub(/\r$/, "")
+              sub(/[[:space:]]+#.*/, "")
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+            }
+            $0 != "" && $0 !~ /^#/ { print }
+          ' rulesets/wyr-darcy.txt | LC_ALL=C sort -u > build/wyr-darcy.txt
+
+          test -s build/wyr-darcy.txt
+          cp build/wyr-darcy.txt publish/geo/geosite/wyr-darcy.list
+
+          {
+            echo "payload:"
+            sed 's/^/  - /' build/wyr-darcy.txt
+          } > publish/geo/geosite/wyr-darcy.yaml
+
+          .tools/mihomo convert-ruleset domain text build/wyr-darcy.txt publish/geo/geosite/wyr-darcy.mrs
+          test -s publish/geo/geosite/wyr-darcy.mrs
+
+      - name: Publish meta branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cd publish
+          git init
+          git checkout -b meta
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add geo
+          git commit -m "build: update rules"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin meta

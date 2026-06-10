@@ -1,0 +1,4 @@
+# 公司内网域名规则，一行一条
+# +.darcytech.com 同时匹配 darcytech.com 和所有子域名
+
++.darcytech.com
