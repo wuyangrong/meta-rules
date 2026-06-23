@@ -46,10 +46,10 @@ jobs:
       - name: Build rules tree
         run: |
           rm -rf build publish
-          mkdir -p build publish
+          mkdir -p build publish/geo/geosite
 
-          git clone --depth 1 --branch meta https://github.com/MetaCubeX/meta-rules-dat.git build/meta-rules-dat
-          cp -R build/meta-rules-dat/geo publish/geo
+          # git clone --depth 1 --branch meta https://github.com/MetaCubeX/meta-rules-dat.git build/meta-rules-dat
+          # cp -R build/meta-rules-dat/geo publish/geo
 
           awk '
             {
