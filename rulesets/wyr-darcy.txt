@@ -3,3 +3,5 @@
 +.topchitu.com
 +.yihuboss.com
 dev01
+kafka01
+kafka02
